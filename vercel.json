@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "framework": null,
+  "buildCommand": "mkdir -p .vercel/output/static/brand .vercel/output/static/assets && sed \"s|{{SITE}}|https://${VERCEL_URL}|g\" web/landing.html > .vercel/output/static/index.html && cp -R web/brand/. .vercel/output/static/brand/ && cp web/gradient-ascii.js .vercel/output/static/assets/gradient-ascii.js",
+  "outputDirectory": ".vercel/output/static"
+}
