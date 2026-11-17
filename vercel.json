@@ -1,6 +1,7 @@
 {
   "version": 2,
   "framework": null,
+  "installCommand": "echo \"Static site: no package install needed\"",
   "buildCommand": "mkdir -p public/brand public/assets && sed \"s|{{SITE}}|https://${VERCEL_URL}|g\" web/landing.html > public/index.html && cp -R web/brand/. public/brand/ && cp web/gradient-ascii.js public/assets/gradient-ascii.js",
   "outputDirectory": "public"
 }
