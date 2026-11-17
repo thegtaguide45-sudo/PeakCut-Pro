@@ -603,6 +603,15 @@ dialog::backdrop{background:rgba(14,12,11,.42);animation:fadein .16s ease}
 .editor video,.editor .stage img{width:100%;max-height:calc(100vh - 48px);aspect-ratio:9/16;object-fit:contain;display:block}
 .editor .panel{padding:22px;overflow:auto;display:flex;flex-direction:column;gap:14px}
 .editor h3{font-size:13px;font-weight:600;color:var(--dim);margin-top:6px}
+.clip-scrub{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--muted)}
+.clip-scrub-top,.clip-scrub-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.clip-scrub-top b{font-size:12px;color:var(--brand-ink)}
+.clip-scrub time{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.clip-scrub input[type=range]{width:100%;height:20px;accent-color:var(--brand);cursor:pointer}
+.clip-scrub-actions .btn{height:30px;padding:0 9px;font-size:11px}
+.clip-trim-help{font-size:11px;color:var(--dim)}
+.editor .panel [data-trim-invalid]{border-color:var(--bad);background:var(--bad-soft)}
+@media(max-width:760px){.editor{grid-template-columns:1fr;max-height:calc(100vh - 24px);overflow:auto}.editor .stage{min-height:220px}.editor video,.editor .stage img{max-height:52vh}.editor .panel{overflow:visible}}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 #toasts{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:50}
 .toast{background:var(--frame);color:var(--frame-text);border:1px solid var(--frame-2);border-radius:var(--r);padding:12px 16px;max-width:380px;animation:rise .2s ease;display:flex;gap:10px;align-items:center;font-weight:500}
@@ -2179,6 +2188,15 @@ function drawClipDlg(full) {
       <div class="panel">
         <div class="job-head" style="margin:0"><div><span class="badge ${scoreCls(c.score)}" style="position:static">${c.judges ? "Words " + c.judges.words + (c.judges.reaction ? " · Reaction " + c.judges.reaction : "") : c.score ? "Score " + c.score : "Clipped by hand"}</span>
           <p class="sub" style="margin-top:8px">${esc(c.reason || "")}</p></div><button class="btn icon ghost" data-act="closedlg" aria-label="Close">${ic("x")}</button></div>
+        ${c.status === "done" ? `<div class="clip-scrub" aria-label="Clip preview timeline">
+          <div class="clip-scrub-top"><b>Preview timeline</b><time id="clipTime">0:00 / --:--</time></div>
+          <input id="clipSeek" type="range" min="0" max="100" step="0.1" value="0" aria-label="Seek through clip">
+          <div class="clip-scrub-actions">
+            <button class="btn" type="button" data-act="use-start">Set start to playhead</button>
+            <button class="btn" type="button" data-act="use-end">Set end to playhead</button>
+          </div>
+          <span class="clip-trim-help">Play or scrub the preview, then set either trim point from the current frame.</span>
+        </div>` : ""}
         <h3>On the video</h3>
         <label class="f">Big text<input data-f="hook" value="${esc(c.hook)}"></label>
         <label class="sw"><input type="checkbox" data-f="captions" data-caption-toggle ${c.captions === false ? "" : "checked"}>Generate captions</label>
@@ -2203,6 +2221,44 @@ function drawClipDlg(full) {
   D.sig = sig;
   put($("#dposts"), postPills(c));
 }
+
+function clipClock(value) {
+  const n = Math.max(0, Number(value) || 0), m = Math.floor(n / 60), sec = Math.floor(n % 60);
+  return m + ":" + String(sec).padStart(2, "0");
+}
+function syncClipScrub() {
+  const video = $("#clipdlg video"), seek = $("#clipSeek"), label = $("#clipTime");
+  if (!video || !seek || !label || !Number.isFinite(video.duration)) return;
+  seek.max = String(video.duration); seek.value = String(video.currentTime || 0);
+  label.textContent = clipClock(video.currentTime) + " / " + clipClock(video.duration);
+}
+$("#clipdlg").addEventListener("loadedmetadata", syncClipScrub, true);
+$("#clipdlg").addEventListener("timeupdate", syncClipScrub, true);
+$("#clipdlg").addEventListener("input", e => {
+  if (e.target.id === "clipSeek") { const video = $("#clipdlg video"); if (video) video.currentTime = Number(e.target.value) || 0; syncClipScrub(); }
+});
+$("#clipdlg").addEventListener("click", e => {
+  const button = e.target.closest("[data-act=use-start],[data-act=use-end]"); if (!button) return;
+  const video = $("#clipdlg video"), field = $("#clipdlg [data-f=" + (button.dataset.act === "use-start" ? "start" : "end") + "]");
+  if (!video || !field) return;
+  field.value = (Math.round(video.currentTime * 10) / 10).toFixed(1);
+  field.dispatchEvent(new Event("input", {bubbles:true}));
+  toast((button.dataset.act === "use-start" ? "Start" : "End") + " point set to " + clipClock(video.currentTime), "ok");
+});
+$("#clipdlg").addEventListener("click", e => {
+  if (!e.target.closest("[data-act=remake]")) return;
+  const start = Number($('#clipdlg [data-f="start"]')?.value), end = Number($('#clipdlg [data-f="end"]')?.value);
+  const duration = Number($("#clipdlg video")?.duration);
+  const badStart = !Number.isFinite(start) || start < 0 || end <= start;
+  const badEnd = !Number.isFinite(end) || end <= start || (Number.isFinite(duration) && duration > 0 && end > duration);
+  if (badStart || badEnd) {
+    e.stopImmediatePropagation();
+    const a = $('#clipdlg [data-f="start"]'), b = $('#clipdlg [data-f="end"]');
+    if (a) a.toggleAttribute("data-trim-invalid", badStart);
+    if (b) b.toggleAttribute("data-trim-invalid", badEnd);
+    toast("Check the trim range: end must be after start and within the clip.", "bad");
+  }
+}, true);
 $("#clipdlg").addEventListener("close", () => { $("#clipdlg").innerHTML = ""; D.jid = null; });
 $("#clipdlg").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 
