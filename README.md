@@ -63,7 +63,7 @@ python -m studio.server
 
 The first start downloads the speech model by itself (about 480 MB, once).
 
-Open http://127.0.0.1:8765. PeakCut Pro opens straight into your creator studio. There is no sign-in: it opens straight into the dashboard. Go to **Settings, AI**, choose
+Open http://127.0.0.1:8765. PeakCut Pro opens straight into your creator studio. There is no sign-in required for local use. Go to **Settings, AI**, choose
 your AI service, paste your key and press **Save and test** (see [Choose your AI](#choose-your-ai)).
 
 ## Choose your AI
